@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SolutionAnalyzer.Mcp\SolutionAnalyzer.Mcp.csproj" />
+    <ProjectReference Include="..\SolutionAnalyzer.Tests.Shared\SolutionAnalyzer.Tests.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

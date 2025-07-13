@@ -9,7 +9,7 @@ namespace SolutionAnalyzer.Mcp.Tools
     [McpServerToolType]
     public static class SolutionTools
     {
-        [McpServerTool, Description("Gets the projects defined in solution")]
+        [McpServerTool, Description("Returns projects defined in solution")]
         public static string ListProjectsInSolution(Solution solution)
         {
             var response = SerializeToJson(solution.Projects.Select(x => new
@@ -21,62 +21,48 @@ namespace SolutionAnalyzer.Mcp.Tools
             return response;
         }
 
-        [McpServerTool, Description("Gets the projects defined in solution")]
-        public static async Task<string> GetSymbolReferencesInSolution(Solution solution,
+        [McpServerTool, Description("Get symbol references in solution")]
+        public static async Task<string> FindSymbolReferencesInSolutionAsync(Solution solution,
 
-            [Description("ProjectName defined in solution")]
-            string projectName,
-
-            [Description(".NET Type name of symbol (without namespace)")]
+            [Description(".NET Type name of symbol")]
             string symbolTypeName,
 
-            [Description("Optional namespace of the symbol if there are multiple symbols with that name")]
+            [Description("Optional namespace of the symbol")]
             string? symbolNamespace,
 
             CancellationToken cancellationToken)
         {
-            var project = solution.Projects.SingleOrDefault(p => p.Name == projectName);
-
-            if (project == null)
+            var symbolTasks = solution.Projects.Select(async p =>
             {
-                throw new ArgumentException($"No project with name {projectName} found");
-            }
+                var symbols = await SymbolFinder.FindDeclarationsAsync(p,
+                    symbolTypeName, ignoreCase: true,
+                    cancellationToken);
 
-            var symbols = (await SymbolFinder.FindDeclarationsAsync(project,
-                symbolTypeName, ignoreCase: true,
-                cancellationToken)).ToArray();
+                return string.IsNullOrEmpty(symbolNamespace)
+                    ? symbols
+                    : symbols.Where(s => s.ContainingNamespace.ToDisplayString() == symbolNamespace);
+            });
 
-            if (!string.IsNullOrEmpty(symbolNamespace))
-            {
-                symbols = symbols.Where(s => s.ContainingNamespace.Name == symbolNamespace).ToArray();
-            }
-
-            if (symbols.Length == 0)
-            {
-                throw new ArgumentException($"No symbol with name {symbolTypeName} found in project {projectName}");
-            }
-
-            if (symbols.Length > 1)
-            {
-                throw new ArgumentException($"Multiple symbols found {string.Join(",", symbols.Select(x => x.Name))} in project {projectName}");
-            }
-
-            var symbol = symbols[0];
-
-            var references = await SymbolFinder.FindReferencesAsync(symbol, solution, cancellationToken);
+            var symbolsInProject = await Task.WhenAll(symbolTasks);
 
             var symbolReferences = new List<object>();
 
-            foreach (var referencedSymbol in references.Where(x => x.Locations.Any()))
+            foreach (var symbolInProject in symbolsInProject.SelectMany(s => s))
             {
-                symbolReferences.Add(new
+                var references = await SymbolFinder.FindReferencesAsync(symbolInProject, solution, cancellationToken);
+
+                foreach (var referencedSymbol in references.Where(x => x.Locations.Any()))
                 {
-                    ReferencedSymbol = referencedSymbol.Definition.ToDisplayString(),
-                    Locations = referencedSymbol.Locations.Select(r => new
+                    symbolReferences.Add(new
                     {
-                        Location = r.Location.ToString()
-                    })
-                });
+                        ReferencedSymbol = referencedSymbol.Definition.ToDisplayString(),
+                        Locations = referencedSymbol.Locations.Select(r => new
+                        {
+                            Location = r.Location.IsInSource ? r.Location.SourceTree?.FilePath : r.Location.ToString(),
+                            Line = r.Location.GetMappedLineSpan().StartLinePosition.Line
+                        })
+                    });
+                }
             }
 
             return SerializeToJson(symbolReferences);

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolutionAnalyzer.Mcp", "Sol
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolutionAnalyzer.Tests", "SolutionAnalyzer.Tests\SolutionAnalyzer.Tests.csproj", "{60794AC1-CAE1-42FF-9FF5-F2E2CCC649BE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolutionAnalyzer.Tests.Shared", "SolutionAnalyzer.Tests.Shared\SolutionAnalyzer.Tests.Shared.csproj", "{1FF5AB67-D697-46A7-B7E6-89D3D8461623}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,11 +23,16 @@ Global
 		{60794AC1-CAE1-42FF-9FF5-F2E2CCC649BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{60794AC1-CAE1-42FF-9FF5-F2E2CCC649BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{60794AC1-CAE1-42FF-9FF5-F2E2CCC649BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1FF5AB67-D697-46A7-B7E6-89D3D8461623}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1FF5AB67-D697-46A7-B7E6-89D3D8461623}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1FF5AB67-D697-46A7-B7E6-89D3D8461623}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1FF5AB67-D697-46A7-B7E6-89D3D8461623}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {05FE8DB1-0412-4796-9147-2C0B11A3A7CC}
 		        SolutionGuid = {26C1E53F-15D3-413B-9370-0F681E60491B}
 	EndGlobalSection
 EndGlobal
