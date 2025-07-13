@@ -1,0 +1,10 @@
+services:
+  solution-analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: net-solution-analyzer-mcp:latest
+    container_name: net-solution-analyzer-mcp
+    volumes:
+      - ../SolutionAnalyzer.Mcp.sln:/app/solution.sln:ro
+    command: ["--SolutionPath", "/app/solution.sln"]
