@@ -1,8 +1,8 @@
-﻿using System.ComponentModel;
-using System.Text.Json;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 using ModelContextProtocol.Server;
+using System.ComponentModel;
+using System.Text.Json;
 
 namespace SolutionAnalyzer.Mcp.Tools
 {
@@ -32,22 +32,11 @@ namespace SolutionAnalyzer.Mcp.Tools
 
             CancellationToken cancellationToken)
         {
-            var symbolTasks = solution.Projects.Select(async p =>
-            {
-                var symbols = await SymbolFinder.FindDeclarationsAsync(p,
-                    symbolTypeName, ignoreCase: true,
-                    cancellationToken);
-
-                return string.IsNullOrEmpty(symbolNamespace)
-                    ? symbols
-                    : symbols.Where(s => s.ContainingNamespace.ToDisplayString() == symbolNamespace);
-            });
-
-            var symbolsInProject = await Task.WhenAll(symbolTasks);
+            var symbolsInSolution = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
 
             var symbolReferences = new List<object>();
 
-            foreach (var symbolInProject in symbolsInProject.SelectMany(s => s))
+            foreach (var symbolInProject in symbolsInSolution)
             {
                 var references = await SymbolFinder.FindReferencesAsync(symbolInProject, solution, cancellationToken);
 
@@ -69,100 +58,206 @@ namespace SolutionAnalyzer.Mcp.Tools
         }
 
         [McpServerTool, Description("Gets the references to property accessors (get or set) defined in solution")]
-        public static async Task<string> GetPropertyAccessorReferencesInSolution(Solution solution,
+        public static async Task<string> FindPropertyReferencesInSolutionAsync(Solution solution,
 
-            [Description("ProjectName defined in solution")]
-            string projectName,
+            [Description(".NET Type name of symbol")]
+            string symbolTypeName,
 
-            [Description(".NET Type name of the property (without namespace)")]
-            string propertyName,
+            [Description("Name of the property")] string propertyName,
 
-            [Description("Optional namespace of the property if there are multiple properties with that name")]
+            [Description("Optional namespace of the property symbol if there are multiple properties with that name")]
             string? propertyNamespace,
 
-            [Description("Accessor type to find references for: 'get', 'set', or 'both'")]
-            string accessorType,
+            [Description("Optional accessor type to find references for: 'get', 'set', or 'both'. If not specified 'both' will be used.")]
+            string? accessorType,
 
             CancellationToken cancellationToken)
         {
-            // Validate accessor type
-            if (accessorType != "get" && accessorType != "set" && accessorType != "both")
+            accessorType = string.IsNullOrWhiteSpace(accessorType) ? "both" : accessorType.ToLowerInvariant();
+
+            var matchingPropertyAccessors = new List<IMethodSymbol>();
+
+            // First find all symbols matching the type name
+            var symbols = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, propertyNamespace, cancellationToken);
+
+            foreach (var symbol in symbols.OfType<INamedTypeSymbol>())
             {
-                throw new ArgumentException("Accessor type must be 'get', 'set', or 'both'");
-            }
+                var matchingProperties = symbol.GetMembers().OfType<IPropertySymbol>()
+                    .Where(p => p.Name == propertyName);
 
-            // Find the project
-            var project = solution.Projects.SingleOrDefault(p => p.Name == projectName);
-            if (project == null)
-            {
-                throw new ArgumentException($"No project with name {projectName} found");
-            }
-
-            // Find property declarations
-            var symbols = (await SymbolFinder.FindDeclarationsAsync(project, propertyName, ignoreCase: true, cancellationToken))
-                .OfType<IPropertySymbol>()
-                .ToArray();
-
-            // Filter by namespace if provided
-            if (!string.IsNullOrEmpty(propertyNamespace))
-            {
-                symbols = symbols.Where(s => s.ContainingNamespace.Name == propertyNamespace).ToArray();
-            }
-
-            if (symbols.Length == 0)
-            {
-                throw new ArgumentException($"No property with name {propertyName} found in project {projectName}");
-            }
-
-            if (symbols.Length > 1)
-            {
-                throw new ArgumentException($"Multiple properties found {string.Join(",", symbols.Select(x => x.Name))} in project {projectName}");
-            }
-
-            var propertySymbol = symbols[0];
-            var accessorSymbols = new List<IMethodSymbol>();
-
-            // Collect the requested accessor(s)
-            if (accessorType == "get" || accessorType == "both")
-            {
-                if (propertySymbol.GetMethod != null)
+                foreach (var property in matchingProperties)
                 {
-                    accessorSymbols.Add(propertySymbol.GetMethod);
-                }
-            }
-            if (accessorType == "set" || accessorType == "both")
-            {
-                if (propertySymbol.SetMethod != null)
-                {
-                    accessorSymbols.Add(propertySymbol.SetMethod);
-                }
-            }
-
-            if (!accessorSymbols.Any())
-            {
-                throw new ArgumentException($"No {accessorType} accessor found for property {propertyName} in project {projectName}");
-            }
-
-            // Find references to each accessor
-            var symbolReferences = new List<object>();
-            foreach (var accessorSymbol in accessorSymbols)
-            {
-                var references = await SymbolFinder.FindReferencesAsync(accessorSymbol, solution, cancellationToken);
-                foreach (var referencedSymbol in references.Where(x => x.Locations.Any()))
-                {
-                    symbolReferences.Add(new
+                    if (accessorType is "get" or "both" && property.GetMethod != null)
                     {
-                        ReferencedSymbol = referencedSymbol.Definition.ToDisplayString(),
-                        AccessorType = accessorSymbol == propertySymbol.GetMethod ? "get" : "set",
-                        Locations = referencedSymbol.Locations.Select(r => new
-                        {
-                            Location = r.Location.ToString()
-                        })
-                    });
+                        matchingPropertyAccessors.Add(property.GetMethod);
+                    }
+
+                    if (accessorType is "set" or "both" && property.SetMethod != null)
+                    {
+                        matchingPropertyAccessors.Add(property.SetMethod);
+                    }
                 }
             }
 
-            return SerializeToJson(symbolReferences);
+            // HashSet to eliminate duplicates
+            var referenceResults = new HashSet<(string Accessor, string Location, int Line)>();
+
+            foreach (var accessor in matchingPropertyAccessors.Distinct(SymbolEqualityComparer.Default))
+            {
+                var references = await SymbolFinder.FindReferencesAsync(accessor, solution, cancellationToken);
+
+                foreach (var reference in references)
+                {
+                    foreach (var location in reference.Locations.Where(loc => loc.Location.IsInSource))
+                    {
+                        var filePath = location.Location.SourceTree?.FilePath ?? "";
+                        var line = location.Location.GetMappedLineSpan().StartLinePosition.Line;
+
+                        referenceResults.Add((accessor.ToDisplayString(), filePath, line));
+                    }
+                }
+            }
+
+            var resultObjects = referenceResults.Select(r => new
+            {
+                r.Accessor,
+                r.Location,
+                r.Line
+            });
+
+            return SerializeToJson(resultObjects);
+        }
+
+        [McpServerTool, Description("Gets the references to a method defined in solution")]
+        public static async Task<string> FindMethodReferencesInSolutionAsync(Solution solution,
+
+            [Description(".NET Type name of the symbol containing the method")]
+            string symbolTypeName,
+
+            [Description("Name of the method to find references for")]
+            string methodName,
+
+            [Description("Optional namespace of the symbol")]
+            string? symbolNamespace,
+
+            CancellationToken cancellationToken)
+        {
+            var matchingMethods = new List<IMethodSymbol>();
+
+            // Get matching type symbols
+            var symbols = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
+
+            foreach (var symbol in symbols.OfType<INamedTypeSymbol>())
+            {
+                // Get methods by name
+                var methods = symbol.GetMembers()
+                    .OfType<IMethodSymbol>()
+                    .Where(m => m.Name == methodName);
+
+                matchingMethods.AddRange(methods);
+            }
+
+            var referenceResults = new HashSet<(string Method, string Location, int Line)>();
+
+            foreach (var method in matchingMethods.Distinct(SymbolEqualityComparer.Default))
+            {
+                var references = await SymbolFinder.FindReferencesAsync(method, solution, cancellationToken);
+
+                foreach (var reference in references)
+                {
+                    foreach (var location in reference.Locations.Where(loc => loc.Location.IsInSource))
+                    {
+                        var filePath = location.Location.SourceTree?.FilePath ?? "";
+                        var line = location.Location.GetMappedLineSpan().StartLinePosition.Line;
+
+                        referenceResults.Add((method.ToDisplayString(), filePath, line));
+                    }
+                }
+            }
+
+            var resultObjects = referenceResults.Select(r => new
+            {
+                r.Method,
+                r.Location,
+                r.Line
+            });
+
+            return SerializeToJson(resultObjects);
+        }
+
+        [McpServerTool, Description("Gets the references to a field defined in solution")]
+        public static async Task<string> FindFieldReferencesInSolutionAsync(Solution solution,
+
+            [Description(".NET Type name of the symbol containing the field")]
+            string symbolTypeName,
+
+            [Description("Name of the field to find references for")]
+            string fieldName,
+
+            [Description("Optional namespace of the symbol")]
+            string? symbolNamespace,
+
+            CancellationToken cancellationToken)
+        {
+            var matchingFields = new List<IFieldSymbol>();
+
+            // Get matching type symbols
+            var symbols = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
+
+            foreach (var symbol in symbols.OfType<INamedTypeSymbol>())
+            {
+                // Get fields by name
+                var fields = symbol.GetMembers()
+                    .OfType<IFieldSymbol>()
+                    .Where(f => f.Name == fieldName);
+
+                matchingFields.AddRange(fields);
+            }
+
+            var referenceResults = new HashSet<(string Field, string Location, int Line)>();
+
+            foreach (var field in matchingFields.Distinct(SymbolEqualityComparer.Default))
+            {
+                var references = await SymbolFinder.FindReferencesAsync(field, solution, cancellationToken);
+
+                foreach (var reference in references)
+                {
+                    foreach (var location in reference.Locations.Where(loc => loc.Location.IsInSource))
+                    {
+                        var filePath = location.Location.SourceTree?.FilePath ?? "";
+                        var line = location.Location.GetMappedLineSpan().StartLinePosition.Line;
+
+                        referenceResults.Add((field.ToDisplayString(), filePath, line));
+                    }
+                }
+            }
+
+            var resultObjects = referenceResults.Select(r => new
+            {
+                r.Field,
+                r.Location,
+                r.Line
+            });
+
+            return SerializeToJson(resultObjects);
+        }
+
+        private static async Task<IEnumerable<ISymbol>> GetSymbolsInSolutionsAsyncValue(Solution solution, string symbolTypeName,
+            string? symbolNamespace, CancellationToken cancellationToken)
+        {
+            var symbolTasks = solution.Projects.Select(async p =>
+            {
+                var symbols = await SymbolFinder.FindDeclarationsAsync(p,
+                    symbolTypeName, ignoreCase: true,
+                    cancellationToken);
+
+                return string.IsNullOrEmpty(symbolNamespace)
+                    ? symbols
+                    : symbols.Where(s => s.ContainingNamespace.ToDisplayString() == symbolNamespace);
+            });
+
+            var symbolsInProject = await Task.WhenAll(symbolTasks);
+            return symbolsInProject.SelectMany(x => x);
         }
 
         private static string SerializeToJson(object response)

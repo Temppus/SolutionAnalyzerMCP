@@ -3,13 +3,19 @@
     public class LookupExample
     {
         // non instance fields
-        public const string Name = "NameConst";
-        public static readonly bool IsStatic = true;
+        public const string ConstName = "NameConst";
+        public static readonly bool StaticBool = true;
+
+        public LookupExample()
+        {
+            // just to have real references
+            MyPrivateMethod();
+            MyStaticMethod();
+        }
 
         // props
         public int Index { get; set; }
         public float X { get; set; }
-        public float Y { get; set; }
 
         // basic methods
         private void MyPrivateMethod() { }
