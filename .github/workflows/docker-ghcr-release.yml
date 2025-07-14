@@ -37,8 +37,8 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ../../SolutionAnalyzer.Mcp
-        file: Dockerfile
+        context: ./SolutionAnalyzer.Mcp
+        file: ./SolutionAnalyzer.Mcp/Dockerfile
         push: true
         tags: |
           ghcr.io/${{ steps.repo_owner.outputs.repo_owner_lc }}/solution-analyzer:latest
