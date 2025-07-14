@@ -33,6 +33,18 @@ namespace SolutionAnalyzer.Tests
         }
 
         [Fact]
+        public async Task Test_Solution_Refresh()
+        {
+            var toolResponse = await SolutionTools.RefreshSolutionAsync(_solutionFixture.SolutionAccessor, CancellationToken.None);
+
+            Assert.Equal("""
+                         {
+                           "Ok": true
+                         }
+                         """, toolResponse);
+        }
+
+        [Fact]
         public async Task Test_Find_Symbol_References()
         {
             var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
