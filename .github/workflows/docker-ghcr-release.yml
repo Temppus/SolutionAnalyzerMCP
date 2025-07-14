@@ -6,7 +6,7 @@ on:
       image_tag:
         description: 'Docker image tag'
         required: true
-        default: '0.1'
+        default: '0.1.0'
 
 permissions:
   packages: write
@@ -36,4 +36,6 @@ jobs:
         context: .
         file: Dockerfile
         push: true
-        tags: ghcr.io/${{ github.repository_owner }}/solution-analyzer:latest
+        tags: |
+          ghcr.io/${{ github.repository_owner }}/solution-analyzer:latest
+          ghcr.io/${{ github.repository_owner }}/solution-analyzer:${{ github.event.inputs.image_tag }}
