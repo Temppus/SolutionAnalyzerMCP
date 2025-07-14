@@ -30,9 +30,8 @@ internal class Program
         var solutionPath = builder.Configuration.GetValue<string>("SolutionPath")
                            ?? throw new InvalidOperationException("SolutionPath is not configured");
 
-        var solution = await SolutionLoader.LoadSolutionAsync(solutionPath);
-
-        builder.Services.AddSingleton(solution);
+        builder.Services.AddSingleton<ISolutionAccessor>(new SolutionAccessor(solutionPath));
+        builder.Services.AddHostedService<SolutionInitHostedService>();
 
         var app = builder.Build();
 

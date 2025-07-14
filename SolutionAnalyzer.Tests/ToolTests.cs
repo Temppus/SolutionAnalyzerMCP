@@ -8,9 +8,9 @@ namespace SolutionAnalyzer.Tests
         private readonly SolutionFixture _solutionFixture = solutionFixture ?? throw new ArgumentNullException(nameof(solutionFixture));
 
         [Fact]
-        public void Test_List_Projects_In_Solution()
+        public async Task Test_List_Projects_In_Solution()
         {
-            var toolResponse = SolutionTools.ListProjectsInSolution(_solutionFixture.Solution);
+            var toolResponse = await SolutionTools.ListProjectsInSolutionAsync(_solutionFixture.SolutionAccessor, CancellationToken.None);
 
             const string expectedResponse = """
                                             [
@@ -35,7 +35,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Symbol_References()
         {
-            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 nameof(LookupExample),
                 symbolNamespace: null,
                 CancellationToken.None);
@@ -46,7 +46,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Symbol_References_Within_Namespace()
         {
-            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 nameof(LookupExample),
                 symbolNamespace: "SolutionAnalyzer.Tests.Shared",
                 CancellationToken.None);
@@ -57,7 +57,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Symbol_References_Within_NonExisting_Namespace()
         {
-            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindSymbolReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 nameof(LookupExample),
                 symbolNamespace: "Not.Exists.Shared", CancellationToken.None);
 
@@ -72,7 +72,7 @@ namespace SolutionAnalyzer.Tests
         [InlineData(null)]
         public async Task Test_Find_Property_References_With_AccessorType(string accessorType)
         {
-            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 propertyName: nameof(LookupExample.X),
                 accessorType: accessorType,
@@ -85,7 +85,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Property_References_Not_Present()
         {
-            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 propertyName: "ABC",
                 accessorType: null,
@@ -98,7 +98,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Property_References_Namespace_Not_Present()
         {
-            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 propertyName: nameof(LookupExample.X),
                 accessorType: null,
@@ -111,7 +111,7 @@ namespace SolutionAnalyzer.Tests
         [Fact]
         public async Task Test_Find_Property_References_SymbolTypeName_Not_Present()
         {
-            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.Solution,
+            var toolResponse = await SolutionTools.FindPropertyReferencesInSolutionAsync(_solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample) + "abc",
                 propertyName: nameof(LookupExample.X),
                 accessorType: null,
@@ -128,7 +128,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Method_References(string methodName)
         {
             var toolResponse = await SolutionTools.FindMethodReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 methodName: methodName,
                 symbolNamespace: "SolutionAnalyzer.Tests.Shared",
@@ -141,7 +141,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Method_References_Not_Present()
         {
             var toolResponse = await SolutionTools.FindMethodReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 methodName: "NonExistentMethod",
                 symbolNamespace: null,
@@ -154,7 +154,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Method_References_Namespace_Not_Present()
         {
             var toolResponse = await SolutionTools.FindMethodReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 methodName: nameof(LookupExample.MyMethod),
                 symbolNamespace: "Invalid.Namespace",
@@ -167,7 +167,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Method_References_SymbolType_Not_Present()
         {
             var toolResponse = await SolutionTools.FindMethodReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample) + "XYZ",
                 methodName: nameof(LookupExample.MyMethod),
                 symbolNamespace: null,
@@ -183,7 +183,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Field_References(string fieldName)
         {
             var toolResponse = await SolutionTools.FindFieldReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 fieldName: fieldName,
                 symbolNamespace: "SolutionAnalyzer.Tests.Shared",
@@ -196,7 +196,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Field_References_Not_Present()
         {
             var toolResponse = await SolutionTools.FindFieldReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 fieldName: "NonExistentField",
                 symbolNamespace: null,
@@ -209,7 +209,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Field_References_Namespace_Not_Present()
         {
             var toolResponse = await SolutionTools.FindFieldReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample),
                 fieldName: nameof(LookupExample.ConstName),
                 symbolNamespace: "Invalid.Namespace",
@@ -222,7 +222,7 @@ namespace SolutionAnalyzer.Tests
         public async Task Test_Find_Field_References_SymbolType_Not_Present()
         {
             var toolResponse = await SolutionTools.FindFieldReferencesInSolutionAsync(
-                solution: _solutionFixture.Solution,
+                solutionAccessor: _solutionFixture.SolutionAccessor,
                 symbolTypeName: nameof(LookupExample) + "XYZ",
                 fieldName: nameof(LookupExample.ConstName),
                 symbolNamespace: null,

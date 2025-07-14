@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 using ModelContextProtocol.Server;
+using SolutionAnalyzer.Mcp.Utils;
 using System.ComponentModel;
 using System.Text.Json;
 
@@ -10,8 +11,10 @@ namespace SolutionAnalyzer.Mcp.Tools
     public static class SolutionTools
     {
         [McpServerTool, Description("Returns projects defined in solution")]
-        public static string ListProjectsInSolution(Solution solution)
+        public static async Task<string> ListProjectsInSolutionAsync(ISolutionAccessor solutionAccessor, CancellationToken cancellationToken)
         {
+            var solution = await solutionAccessor.GetSolutionAsync(cancellationToken);
+
             var response = SerializeToJson(solution.Projects.Select(x => new
             {
                 ProjectName = x.Name,
@@ -21,8 +24,27 @@ namespace SolutionAnalyzer.Mcp.Tools
             return response;
         }
 
+        [McpServerTool, Description("Refresh state of the solution. " +
+                                    "Should be called when any files were changed in the solution ")]
+        public static async Task<string> RefreshSolutionAsync(ISolutionAccessor solutionAccessor, CancellationToken cancellationToken)
+        {
+            var solution = await solutionAccessor.ReloadAsync(cancellationToken);
+
+            if (solution == null)
+            {
+                throw new InvalidOperationException("Failed to reload solution");
+            }
+
+            var response = SerializeToJson(new
+            {
+                Ok = true
+            });
+
+            return response;
+        }
+
         [McpServerTool, Description("Get symbol references in solution")]
-        public static async Task<string> FindSymbolReferencesInSolutionAsync(Solution solution,
+        public static async Task<string> FindSymbolReferencesInSolutionAsync(ISolutionAccessor solutionAccessor,
 
             [Description(".NET Type name of symbol")]
             string symbolTypeName,
@@ -32,6 +54,8 @@ namespace SolutionAnalyzer.Mcp.Tools
 
             CancellationToken cancellationToken)
         {
+            var solution = await solutionAccessor.GetSolutionAsync(cancellationToken);
+
             var symbolsInSolution = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
 
             var symbolReferences = new List<object>();
@@ -58,7 +82,7 @@ namespace SolutionAnalyzer.Mcp.Tools
         }
 
         [McpServerTool, Description("Gets the references to property accessors (get or set) defined in solution")]
-        public static async Task<string> FindPropertyReferencesInSolutionAsync(Solution solution,
+        public static async Task<string> FindPropertyReferencesInSolutionAsync(ISolutionAccessor solutionAccessor,
 
             [Description(".NET Type name of symbol")]
             string symbolTypeName,
@@ -74,6 +98,8 @@ namespace SolutionAnalyzer.Mcp.Tools
             CancellationToken cancellationToken)
         {
             accessorType = string.IsNullOrWhiteSpace(accessorType) ? "both" : accessorType.ToLowerInvariant();
+
+            var solution = await solutionAccessor.GetSolutionAsync(cancellationToken);
 
             var matchingPropertyAccessors = new List<IMethodSymbol>();
 
@@ -129,7 +155,7 @@ namespace SolutionAnalyzer.Mcp.Tools
         }
 
         [McpServerTool, Description("Gets the references to a method defined in solution")]
-        public static async Task<string> FindMethodReferencesInSolutionAsync(Solution solution,
+        public static async Task<string> FindMethodReferencesInSolutionAsync(ISolutionAccessor solutionAccessor,
 
             [Description(".NET Type name of the symbol containing the method")]
             string symbolTypeName,
@@ -143,6 +169,8 @@ namespace SolutionAnalyzer.Mcp.Tools
             CancellationToken cancellationToken)
         {
             var matchingMethods = new List<IMethodSymbol>();
+
+            var solution = await solutionAccessor.GetSolutionAsync(cancellationToken);
 
             // Get matching type symbols
             var symbols = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
@@ -186,7 +214,7 @@ namespace SolutionAnalyzer.Mcp.Tools
         }
 
         [McpServerTool, Description("Gets the references to a field defined in solution")]
-        public static async Task<string> FindFieldReferencesInSolutionAsync(Solution solution,
+        public static async Task<string> FindFieldReferencesInSolutionAsync(ISolutionAccessor solutionAccessor,
 
             [Description(".NET Type name of the symbol containing the field")]
             string symbolTypeName,
@@ -200,6 +228,8 @@ namespace SolutionAnalyzer.Mcp.Tools
             CancellationToken cancellationToken)
         {
             var matchingFields = new List<IFieldSymbol>();
+
+            var solution = await solutionAccessor.GetSolutionAsync(cancellationToken);
 
             // Get matching type symbols
             var symbols = await GetSymbolsInSolutionsAsyncValue(solution, symbolTypeName, symbolNamespace, cancellationToken);
