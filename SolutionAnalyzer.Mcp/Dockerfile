@@ -10,7 +10,8 @@ RUN dotnet restore --configfile nuget.config
 COPY . ./
 RUN dotnet publish -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
+# roslyn needs dotnet sdk to work (we cn not use runtime)
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS final
 WORKDIR /app
 COPY --from=build /app ./
 ENTRYPOINT ["dotnet", "SolutionAnalyzer.Mcp.dll"]
