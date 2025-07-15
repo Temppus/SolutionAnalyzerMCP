@@ -28,7 +28,7 @@ internal class Program
         });
 
         var solutionPath = builder.Configuration.GetValue<string>("SolutionPath")
-                           ?? throw new InvalidOperationException("SolutionPath is not configured");
+                           ?? "/app/solution.sln";
 
         builder.Services.AddSingleton<ISolutionAccessor>(new SolutionAccessor(solutionPath));
         builder.Services.AddHostedService<SolutionInitHostedService>();
