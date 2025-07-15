@@ -7,9 +7,12 @@ MCP server that uses roslyn to query relevant context from larger net solution c
       "args": [
         "run",
         "-i",
-        "-v",        
-        "/c/git-repos/your-project/your-project.sln:/app/solution.sln",
-        "ghcr.io/temppus/solution-analyzer"
+        "--rm",
+        "--mount",
+        "type=bind,src=/c/git-repos/your-repo-dir,dst=/app/your-repo-dir",
+        "ghcr.io/temppus/solution-analyzer",
+        "--SolutionPath",
+        "/app/your-repo-dir/your-solution.sln"
       ]
     },
 ```
